@@ -1,30 +1,32 @@
+import { FaClock, FaCloudSun, FaNewspaper, FaBell, FaBolt } from 'react-icons/fa'
+
 function QuickActions({ onAction, isLoading }) {
   const actions = [
     { 
       id: 'time', 
       label: 'Current Time', 
-      icon: '🕐', 
+      icon: FaClock, 
       description: 'Get current time and date',
       color: 'from-blue-500 to-cyan-500'
     },
     { 
       id: 'weather', 
       label: 'Weather Update', 
-      icon: '🌤️', 
+      icon: FaCloudSun, 
       description: 'Weather in Hyderabad',
       color: 'from-cyan-500 to-blue-500'
     },
     { 
       id: 'news', 
       label: 'Latest News', 
-      icon: '📰', 
+      icon: FaNewspaper, 
       description: 'Headlines from India',
       color: 'from-purple-500 to-pink-500'
     },
     { 
       id: 'reminders', 
       label: 'My Reminders', 
-      icon: '⏰', 
+      icon: FaBell, 
       description: 'Show upcoming reminders',
       color: 'from-pink-500 to-rose-500'
     },
@@ -34,7 +36,7 @@ function QuickActions({ onAction, isLoading }) {
     <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4 shadow-xl">
       <div className="flex items-center space-x-2 mb-4">
         <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-md flex items-center justify-center">
-          <span className="text-white text-xs">⚡</span>
+          <FaBolt className="text-white text-xs" />
         </div>
         <h3 className="text-lg font-semibold text-white">Quick Actions</h3>
       </div>
@@ -53,7 +55,7 @@ function QuickActions({ onAction, isLoading }) {
           >
             <div className="flex items-center space-x-2">
               <div className={`w-8 h-8 bg-gradient-to-r ${action.color} rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200`}>
-                <span className="text-sm">{action.icon}</span>
+                <action.icon className="text-sm text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-white text-sm group-hover:text-blue-200 transition-colors">
@@ -67,7 +69,7 @@ function QuickActions({ onAction, isLoading }) {
       
       <div className="mt-4 p-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg border border-white/20">
         <div className="flex items-center space-x-2 mb-2">
-          <span className="text-sm">💡</span>
+          <FaBolt className="text-sm text-yellow-400" />
           <h4 className="font-semibold text-white text-sm">Voice Commands</h4>
         </div>
         <div className="text-xs text-blue-200 space-y-1">

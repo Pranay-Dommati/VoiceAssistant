@@ -6,6 +6,7 @@ import time
 
 from services import WeatherService, NewsService, ReminderManager
 from command_parser import CommandParser
+from gemini_processor import GeminiCommandProcessor
 import config
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ weather_service = WeatherService()
 news_service = NewsService()
 reminder_manager = ReminderManager()
 command_parser = CommandParser()
+gemini_processor = GeminiCommandProcessor()
 
 # Global state for reminders checking
 reminder_checker_running = False
@@ -61,11 +63,8 @@ def get_time():
         'response': f"The current time is {current_time}"
     })
 
-@app.route('/api/weather', methods=['GET'])
-def get_weather():
-    """Get weather information"""
-    city = request.args.get('city', config.DEFAULT_CITY)
-    
+def get_weather_for_city(city):
+    """Get weather information for a specific city"""
     try:
         weather_data = weather_service.get_weather(city)
         
@@ -83,20 +82,27 @@ def get_weather():
                     'success': False,
                     'error': weather_data['error'],
                     'response': f"Sorry, I couldn't get weather information: {weather_data['error']}"
-                })
-        else:
-            return jsonify({
-                'success': True,
-                'data': weather_data,
-                'response': f"The weather in {weather_data['city']} is {weather_data['temperature']} with {weather_data['description']}",
-                'is_mock': False
-            })
+                }), 400
+        
+        return jsonify({
+            'success': True,
+            'data': weather_data,
+            'response': f"The weather in {weather_data['city']} is {weather_data['temperature']} with {weather_data['description']}",
+            'weather': weather_data
+        })
+    
     except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e),
             'response': f"Error getting weather: {str(e)}"
         }), 500
+
+@app.route('/api/weather', methods=['GET'])
+def get_weather():
+    """Get weather information"""
+    city = request.args.get('city', config.DEFAULT_CITY)
+    return get_weather_for_city(city)
 
 @app.route('/api/news', methods=['GET'])
 def get_news():
@@ -177,19 +183,21 @@ def add_reminder():
         data = request.get_json()
         command = data.get('command', '')
         
-        parsed = command_parser.parse_reminder_command(command)
+        # Use Gemini processor for better understanding
+        result = gemini_processor.process_command(command)
         
-        if parsed:
-            text, reminder_time = parsed
+        if result["action"] == "reminder_set" and "error" not in result:
+            text = result.get("text", "")
+            reminder_time = datetime.fromisoformat(result.get("time", ""))
+            
             if reminder_manager.add_reminder(text, reminder_time):
-                formatted_time = reminder_time.strftime("%I:%M %p on %B %d")
                 return jsonify({
                     'success': True,
-                    'response': f"Reminder set for {formatted_time}: {text}",
+                    'response': result.get("response"),
                     'data': {
                         'text': text,
-                        'time': reminder_time.isoformat(),
-                        'formatted_time': formatted_time
+                        'time': result.get("time"),
+                        'formatted_time': result.get("formatted_time")
                     }
                 })
             else:
@@ -201,8 +209,8 @@ def add_reminder():
         else:
             return jsonify({
                 'success': False,
-                'error': 'Could not parse reminder',
-                'response': "I couldn't understand the reminder format. Try 'remind me to call mom in 10 minutes'"
+                'error': result.get("error", 'Could not parse reminder'),
+                'response': result.get("response", "I couldn't understand the reminder format. Try 'remind me to call mom in 10 minutes'")
             })
     except Exception as e:
         return jsonify({
@@ -213,53 +221,137 @@ def add_reminder():
 
 @app.route('/api/command', methods=['POST'])
 def process_command():
-    """Process a general command"""
+    """Process a general command using Gemini AI"""
     try:
         data = request.get_json()
-        command = data.get('command', '').lower()
+        command = data.get('command', '').strip()
         
         # Remove wake word if present
-        if config.WAKE_WORD in command:
+        if config.WAKE_WORD in command.lower():
             command = command.replace(config.WAKE_WORD, "").strip()
         
-        # Route to appropriate handler based on command content
-        if any(word in command for word in ['time', 'clock']):
-            return get_time()
+        # Process command with Gemini
+        result = gemini_processor.process_command(command)
         
-        elif any(word in command for word in ['date', 'day', 'today']):
-            return get_time()  # Returns both time and date
-        
-        elif any(word in command for word in ['weather', 'temperature']):
-            city = command_parser.extract_city_from_weather(command)
-            return get_weather() if city == config.DEFAULT_CITY else get_weather()
-        
-        elif any(word in command for word in ['news', 'headlines']):
-            category = command_parser.extract_news_category(command)
-            # Simulate query parameter
-            request.args = {'category': category}
-            return get_news()
-        
-        elif any(word in command for word in ['remind', 'reminder']):
-            if 'list' in command or 'show' in command:
-                return get_reminders()
-            else:
-                return add_reminder()
-        
-        elif any(word in command for word in ['help', 'what can you do']):
+        # Execute the action based on Gemini's understanding
+        if result["action"] == "time":
             return jsonify({
                 'success': True,
-                'response': """I can help you with:
-• Time and date information
-• Weather updates for any city (default: Hyderabad)
-• Latest news headlines from India
-• Setting and managing reminders
-
-Commands you can try:
-• "What time is it?"
-• "Weather in Mumbai"
-• "Latest news"
-• "Remind me to call mom in 10 minutes"
-• "Show my reminders" """,
+                'response': result["response"],
+                'data': {
+                    'time': result.get("time"),
+                    'date': result.get("date")
+                }
+            })
+        
+        elif result["action"] == "weather":
+            city = result.get("city", config.DEFAULT_CITY)
+            weather_response = get_weather_for_city(city)
+            
+            if weather_response.status_code == 200:
+                weather_data = weather_response.get_json()
+                if weather_data.get("success"):
+                    # Generate natural response with Gemini
+                    natural_response = gemini_processor.generate_natural_response({
+                        "action": "weather",
+                        "success": True,
+                        "data": weather_data.get("data", {})
+                    })
+                    weather_data["response"] = natural_response
+                return jsonify(weather_data)
+            else:
+                return weather_response
+        
+        elif result["action"] == "news":
+            category = result.get("category", "general")
+            
+            try:
+                news_data = news_service.get_news(category=category)
+                
+                if "error" in news_data:
+                    if "mock_data" in news_data:
+                        headlines = news_data["mock_data"]["headlines"]
+                        natural_response = gemini_processor.generate_natural_response({
+                            "action": "news",
+                            "success": True,
+                            "data": headlines,
+                            "category": category
+                        })
+                        return jsonify({
+                            'success': True,
+                            'data': headlines,
+                            'response': natural_response,
+                            'is_mock': True
+                        })
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': news_data['error'],
+                            'response': f"Sorry, I couldn't get news: {news_data['error']}"
+                        })
+                else:
+                    headlines = news_data["headlines"]
+                    natural_response = gemini_processor.generate_natural_response({
+                        "action": "news",
+                        "success": True,
+                        "data": headlines,
+                        "category": category
+                    })
+                    return jsonify({
+                        'success': True,
+                        'data': headlines,
+                        'response': natural_response,
+                        'is_mock': False
+                    })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'response': f"Error getting news: {str(e)}"
+                }), 500
+        
+        elif result["action"] == "reminder_set":
+            if "error" in result:
+                return jsonify({
+                    'success': False,
+                    'error': result["error"],
+                    'response': result["response"]
+                })
+            
+            try:
+                text = result.get("text", "")
+                reminder_time = datetime.fromisoformat(result.get("time", ""))
+                
+                if reminder_manager.add_reminder(text, reminder_time):
+                    return jsonify({
+                        'success': True,
+                        'response': result["response"],
+                        'data': {
+                            'text': text,
+                            'time': result.get("time"),
+                            'formatted_time': result.get("formatted_time")
+                        }
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Failed to save reminder',
+                        'response': "I couldn't set that reminder. Please try again."
+                    })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'response': f"Error setting reminder: {str(e)}"
+                }), 500
+        
+        elif result["action"] == "reminder_list":
+            return get_reminders()
+        
+        elif result["action"] == "help":
+            return jsonify({
+                'success': True,
+                'response': result["response"],
                 'data': {
                     'help': True,
                     'commands': [
@@ -268,10 +360,10 @@ Commands you can try:
                 }
             })
         
-        else:
+        else:  # unknown action
             return jsonify({
                 'success': True,
-                'response': "I'm not sure how to help with that. Try asking about time, weather, news, or reminders.",
+                'response': result["response"],
                 'data': {
                     'suggestion': 'Try commands like "what time is it", "weather", "news", or "remind me to..."'
                 }

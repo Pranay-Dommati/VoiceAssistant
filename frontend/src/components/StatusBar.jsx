@@ -50,12 +50,6 @@ function StatusBar({ status, isLoading }) {
           })}
         </span>
       </div>
-      
-      {/* Location */}
-      <div className="hidden md:flex items-center space-x-2 text-white/60">
-        <span className="text-sm">📍</span>
-        <span className="text-sm">Hyderabad, IN</span>
-      </div>
     </div>
   )
 }

@@ -115,17 +115,28 @@ class CommandParser:
         """Extract city name from weather command"""
         command = command.lower()
         
-        # Common patterns
+        # Common patterns - more comprehensive
         patterns = [
             r'weather in ([a-zA-Z\s]+)',
             r'weather for ([a-zA-Z\s]+)',
-            r'weather at ([a-zA-Z\s]+)'
+            r'weather at ([a-zA-Z\s]+)',
+            r'weather of ([a-zA-Z\s]+)',
+            r'how is the weather in ([a-zA-Z\s]+)',
+            r'what is the weather in ([a-zA-Z\s]+)',
+            r'temperature in ([a-zA-Z\s]+)',
+            r'temperature at ([a-zA-Z\s]+)',
+            r'temperature of ([a-zA-Z\s]+)',
+            r'([a-zA-Z\s]+) weather',  # "mumbai weather"
+            r'([a-zA-Z\s]+) temperature'  # "mumbai temperature"
         ]
         
         for pattern in patterns:
             match = re.search(pattern, command)
             if match:
-                return match.group(1).strip().title()
+                city = match.group(1).strip().title()
+                # Filter out common words that might be mistaken for cities
+                if city.lower() not in ['the', 'is', 'what', 'how', 'current', 'today', 'now']:
+                    return city
         
         return config.DEFAULT_CITY  # Default city from config
     

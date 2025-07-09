@@ -3,6 +3,30 @@ import ChatMessage from './ChatMessage'
 import QuickActions from './QuickActions'
 import TextInput from './TextInput'
 import StatusBar from './StatusBar'
+import { 
+  FaRobot, 
+  FaMicrophone, 
+  FaMicrophoneSlash, 
+  FaPaperPlane, 
+  FaCog, 
+  FaTimes, 
+  FaClock, 
+  FaCloudSun, 
+  FaNewspaper, 
+  FaBell,
+  FaLightbulb,
+  FaKeyboard,
+  FaVolumeUp,
+  FaChevronUp,
+  FaCircle,
+  FaPlus,
+  FaCalendarAlt,
+  FaArrowLeft,
+  FaTrash,
+  FaEdit,
+  FaCheck,
+  FaEye
+} from 'react-icons/fa'
 
 const API_BASE_URL = 'http://localhost:5000/api'
 
@@ -14,7 +38,12 @@ function VoiceAssistant() {
   const [isListening, setIsListening] = useState(false)
   const [isVoiceSupported, setIsVoiceSupported] = useState(false)
   const [showTools, setShowTools] = useState(false)
+  const [activeToolView, setActiveToolView] = useState('main') // 'main', 'reminders'
   const [input, setInput] = useState('')
+  const [reminderInput, setReminderInput] = useState('')
+  const [reminderTime, setReminderTime] = useState('')
+  const [reminderDate, setReminderDate] = useState('')
+  const [isInitialized, setIsInitialized] = useState(false)
   const chatEndRef = useRef(null)
   const textareaRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -22,10 +51,33 @@ function VoiceAssistant() {
 
   // Initialize component
   useEffect(() => {
-    fetchConfig()
-    initializeVoice()
-    addMessage("🤖 Assistant: Hello! I'm your voice assistant configured for Hyderabad, India. How can I help you today?", 'assistant')
-  }, [])
+    if (!isInitialized) {
+      fetchConfig()
+      initializeVoice()
+      setIsInitialized(true)
+      
+      // Add initial message only once, after a short delay
+      setTimeout(() => {
+        setMessages(prev => {
+          // Check if initial message already exists
+          const hasInitialMessage = prev.some(msg => 
+            msg.sender === 'assistant' && msg.content.includes("Hello! I'm your AI voice assistant")
+          )
+          
+          if (!hasInitialMessage) {
+            return [...prev, {
+              id: Date.now(),
+              content: "🤖 Assistant: Hello! I'm your AI voice assistant. I can help you with weather for any city, news, reminders, and more. How can I help you today?",
+              sender: 'assistant',
+              timestamp: new Date().toLocaleTimeString()
+            }]
+          }
+          
+          return prev
+        })
+      }, 100)
+    }
+  }, [isInitialized])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -148,6 +200,17 @@ function VoiceAssistant() {
   }
 
   const addMessage = (content, sender = 'user') => {
+    // Prevent duplicate initial messages
+    if (sender === 'assistant' && content.includes("Hello! I'm your AI voice assistant")) {
+      // Check if this message already exists
+      const existingMessage = messages.find(msg => 
+        msg.sender === 'assistant' && msg.content.includes("Hello! I'm your AI voice assistant")
+      )
+      if (existingMessage) {
+        return // Don't add duplicate
+      }
+    }
+    
     const newMessage = {
       id: Date.now(),
       content,
@@ -198,6 +261,13 @@ function VoiceAssistant() {
   }
 
   const handleQuickAction = async (action) => {
+    if (action === 'reminders') {
+      // Open the reminders panel instead of making an API call
+      setActiveToolView('reminders')
+      setShowTools(true)
+      return
+    }
+
     setIsLoading(true)
     setStatus('Processing...')
 
@@ -212,9 +282,6 @@ function VoiceAssistant() {
           break
         case 'news':
           response = await fetch(`${API_BASE_URL}/news`)
-          break
-        case 'reminders':
-          response = await fetch(`${API_BASE_URL}/reminders`)
           break
         default:
           return
@@ -242,19 +309,79 @@ function VoiceAssistant() {
     }
   }
 
+  const handleCreateReminder = async () => {
+    if (!reminderInput.trim()) return
+
+    // Create the reminder command
+    let command = `remind me to ${reminderInput.trim()}`
+    
+    if (reminderTime) {
+      command += ` at ${reminderTime}`
+    }
+    
+    if (reminderDate) {
+      command += ` on ${reminderDate}`
+    }
+    
+    // Send the command to the assistant
+    await sendCommand(command)
+    
+    // Clear the form
+    setReminderInput('')
+    setReminderTime('')
+    setReminderDate('')
+    
+    // Close the reminders panel
+    setActiveToolView('main')
+    setShowTools(false)
+  }
+
+  const handleGetReminders = async () => {
+    setIsLoading(true)
+    setStatus('Getting reminders...')
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/reminders`)
+      const data = await response.json()
+      
+      if (data.success) {
+        const responseMessage = `🤖 Assistant: ${data.response}`
+        addMessage(responseMessage, 'assistant')
+        speakText(responseMessage)
+      } else {
+        const errorMessage = `🤖 Assistant: ${data.response || 'Sorry, I encountered an error.'}`
+        addMessage(errorMessage, 'assistant')
+        speakText(errorMessage)
+      }
+    } catch (error) {
+      console.error('API Error:', error)
+      const errorMessage = "🤖 Assistant: Sorry, I'm having trouble connecting to my services."
+      addMessage(errorMessage, 'assistant')
+      speakText(errorMessage)
+    } finally {
+      setIsLoading(false)
+      setStatus('Ready')
+    }
+  }
+
+  const handleToolsClose = () => {
+    setShowTools(false)
+    setActiveToolView('main')
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
-      <header className="bg-white/10 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+      <header className="bg-white/10 backdrop-blur-md border-b border-white/20 flex-shrink-0 z-50">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-xl">🤖</span>
+                <FaRobot className="text-xl text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">AI Voice Assistant</h1>
-                <p className="text-blue-200 text-xs">Hyderabad, India</p>
+                <p className="text-blue-200 text-xs">Global assistant for weather, news & more</p>
               </div>
             </div>
             
@@ -264,7 +391,7 @@ function VoiceAssistant() {
                 <button
                   onClick={isListening ? stopListening : startListening}
                   disabled={isLoading}
-                  className={`relative w-12 h-12 rounded-full border-2 transition-all duration-300 ${
+                  className={`relative w-12 h-12 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
                     isListening
                       ? 'bg-red-500 border-red-400 animate-pulse'
                       : isLoading
@@ -272,9 +399,11 @@ function VoiceAssistant() {
                         : 'bg-gradient-to-r from-green-500 to-emerald-500 border-green-400 hover:scale-110 hover:shadow-lg'
                   }`}
                 >
-                  <span className="text-xl">
-                    {isListening ? '🔴' : '🎤'}
-                  </span>
+                  {isListening ? (
+                    <FaMicrophoneSlash className="text-xl text-white" />
+                  ) : (
+                    <FaMicrophone className="text-xl text-white" />
+                  )}
                   {isListening && (
                     <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping"></div>
                   )}
@@ -287,20 +416,20 @@ function VoiceAssistant() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Full Width Chat Container */}
-        <div className="chat-container rounded-2xl h-[calc(100vh-200px)] flex flex-col">
+      {/* Main Content - Full Screen Chat */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Chat Container - Full Screen */}
+        <div className="flex-1 flex flex-col bg-white/5 backdrop-blur-sm min-h-0">
           {/* Chat Header */}
-          <div className="px-6 py-4 border-b border-white/20 flex-shrink-0">
+          <div className="px-6 py-4 border-b border-white/10 flex-shrink-0">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                <FaCircle className="text-xs text-green-400 animate-pulse" />
                 <span>Conversation</span>
               </h2>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 text-sm text-blue-200">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                  <FaCircle className="text-xs text-blue-400" />
                   <span>Live</span>
                 </div>
                 {/* Tools Button */}
@@ -309,105 +438,114 @@ function VoiceAssistant() {
                   className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all duration-300"
                   title="Open Tools"
                 >
-                  <span className="text-sm">⚙️</span>
+                  <FaCog className="text-sm text-white" />
                 </button>
               </div>
             </div>
           </div>
           
-          {/* Chat Messages Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 chat-scroll">
-            {messages.length === 0 && (
-              <div className="text-center py-16 animate-fadeInUp">
-                <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 glow animate-float">
-                  <span className="text-4xl">🤖</span>
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Welcome to AI Assistant</h3>
-                <p className="text-blue-200 text-lg mb-6">I'm here to help you with weather, news, reminders, and more!</p>
-                
-                {/* Voice Status */}
-                {isVoiceSupported ? (
-                  <div className="mb-6 p-4 bg-green-500/20 rounded-xl border border-green-400/30 max-w-md mx-auto">
-                    <div className="flex items-center justify-center space-x-2 text-green-200">
-                      <span className="text-xl">🎤</span>
-                      <span className="font-medium">Voice input is ready!</span>
-                    </div>
-                    <p className="text-sm text-green-300 mt-2">Click the microphone button or type your message below</p>
+          {/* Chat Messages Area - Scrollable */}
+          <div className="flex-1 overflow-y-auto chat-scroll min-h-0">
+            <div className="max-w-4xl mx-auto px-6 py-6 space-y-4 min-h-full">
+              {messages.length === 0 && (
+                <div className="text-center py-16 animate-fadeInUp">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 glow animate-float">
+                    <FaRobot className="text-4xl text-white" />
                   </div>
-                ) : (
-                  <div className="mb-6 p-4 bg-yellow-500/20 rounded-xl border border-yellow-400/30 max-w-md mx-auto">
-                    <div className="flex items-center justify-center space-x-2 text-yellow-200">
-                      <span className="text-xl">⚠️</span>
-                      <span className="font-medium">Voice input not supported</span>
+                  <h3 className="text-2xl font-bold text-white mb-3">Welcome to AI Assistant</h3>
+                  <p className="text-blue-200 text-lg mb-6">I can help you with weather for any city, news, reminders, and more!</p>
+                  
+                  {/* Voice Status */}
+                  {isVoiceSupported ? (
+                    <div className="mb-6 p-4 bg-green-500/20 rounded-xl border border-green-400/30 max-w-md mx-auto">
+                      <div className="flex items-center justify-center space-x-2 text-green-200">
+                        <FaMicrophone className="text-xl" />
+                        <span className="font-medium">Voice input is ready!</span>
+                      </div>
+                      <p className="text-sm text-green-300 mt-2">Click the microphone button or type your message below</p>
                     </div>
-                    <p className="text-sm text-yellow-300 mt-2">Please use the text input below</p>
+                  ) : (
+                    <div className="mb-6 p-4 bg-yellow-500/20 rounded-xl border border-yellow-400/30 max-w-md mx-auto">
+                      <div className="flex items-center justify-center space-x-2 text-yellow-200">
+                        <FaMicrophoneSlash className="text-xl" />
+                        <span className="font-medium">Voice input not supported</span>
+                      </div>
+                      <p className="text-sm text-yellow-300 mt-2">Please use the text input below</p>
+                    </div>
+                  )}
+                  
+                  {/* Quick Action Chips */}
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <button 
+                      onClick={() => handleQuickAction('time')}
+                      className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm flex items-center space-x-2"
+                    >
+                      <FaClock />
+                      <span>Current Time</span>
+                    </button>
+                    <button 
+                      onClick={() => handleQuickAction('weather')}
+                      className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm flex items-center space-x-2"
+                    >
+                      <FaCloudSun />
+                      <span>Weather</span>
+                    </button>
+                    <button 
+                      onClick={() => handleQuickAction('news')}
+                      className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm flex items-center space-x-2"
+                    >
+                      <FaNewspaper />
+                      <span>News</span>
+                    </button>
+                    <button 
+                      onClick={() => handleQuickAction('reminders')}
+                      className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm flex items-center space-x-2"
+                    >
+                      <FaBell />
+                      <span>Reminders</span>
+                    </button>
                   </div>
-                )}
-                
-                {/* Quick Action Chips */}
-                <div className="flex flex-wrap justify-center gap-3">
-                  <button 
-                    onClick={() => handleQuickAction('time')}
-                    className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm"
-                  >
-                    🕐 Current Time
-                  </button>
-                  <button 
-                    onClick={() => handleQuickAction('weather')}
-                    className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm"
-                  >
-                    🌤️ Weather
-                  </button>
-                  <button 
-                    onClick={() => handleQuickAction('news')}
-                    className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm"
-                  >
-                    📰 News
-                  </button>
-                  <button 
-                    onClick={() => handleQuickAction('reminders')}
-                    className="quick-chip px-4 py-2 rounded-full text-blue-200 text-sm"
-                  >
-                    ⏰ Reminders
-                  </button>
                 </div>
-              </div>
-            )}
-            
-            {messages.map((message) => (
-              <ChatMessage 
-                key={message.id} 
-                message={message} 
-              />
-            ))}
-            
-            {isListening && (
-              <div className="flex items-center justify-center space-x-4 py-6 bg-blue-500/20 rounded-xl border border-blue-400/30 mx-4 mb-4 animate-pulse">
-                <div className="flex space-x-2">
-                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
-                  <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-3 h-3 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              )}
+              
+              {messages.map((message) => (
+                <ChatMessage 
+                  key={message.id} 
+                  message={message} 
+                />
+              ))}
+              
+              {isListening && (
+                <div className="flex items-center justify-center space-x-4 py-6 bg-blue-500/20 rounded-xl border border-blue-400/30 animate-pulse max-w-md mx-auto">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
+                    <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-3 h-3 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  </div>
+                  <span className="text-blue-200 font-medium flex items-center space-x-2">
+                    <FaMicrophone />
+                    <span>Listening... Speak now!</span>
+                  </span>
                 </div>
-                <span className="text-blue-200 font-medium">🎤 Listening... Speak now!</span>
-              </div>
-            )}
-            
-            {isLoading && (
-              <div className="flex items-center justify-center space-x-4 py-6">
-                <div className="flex space-x-2">
-                  <div className="w-3 h-3 bg-blue-400 rounded-full typing-dot"></div>
-                  <div className="w-3 h-3 bg-purple-400 rounded-full typing-dot"></div>
-                  <div className="w-3 h-3 bg-pink-400 rounded-full typing-dot"></div>
+              )}
+              
+              {isLoading && (
+                <div className="flex items-center justify-center space-x-4 py-6 max-w-md mx-auto">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 bg-blue-400 rounded-full typing-dot"></div>
+                    <div className="w-3 h-3 bg-purple-400 rounded-full typing-dot"></div>
+                    <div className="w-3 h-3 bg-pink-400 rounded-full typing-dot"></div>
+                  </div>
+                  <span className="text-blue-200 font-medium">Assistant is thinking...</span>
                 </div>
-                <span className="text-blue-200 font-medium">Assistant is thinking...</span>
-              </div>
-            )}
-            <div ref={chatEndRef} />
+              )}
+              <div ref={chatEndRef} />
+            </div>
           </div>
 
-          {/* Integrated Input Area */}
-          <div className="chat-input-area flex-shrink-0">
-            <div className="p-6">
+          {/* Integrated Input Area - Fixed at Bottom */}
+          <div className="chat-input-area flex-shrink-0 border-t border-white/10">
+            <div className="max-w-4xl mx-auto px-6 py-6">
               <form 
                 onSubmit={(e) => { 
                   e.preventDefault(); 
@@ -462,9 +600,11 @@ function VoiceAssistant() {
                       }`}
                       title={isListening ? 'Stop listening' : 'Start voice input'}
                     >
-                      <span className="text-2xl relative z-10">
-                        {isListening ? '🔴' : '🎤'}
-                      </span>
+                      {isListening ? (
+                        <FaMicrophoneSlash className="text-2xl text-white relative z-10" />
+                      ) : (
+                        <FaMicrophone className="text-2xl text-white relative z-10" />
+                      )}
                       {isListening && (
                         <div className="absolute inset-0 rounded-2xl border-2 border-red-400 animate-ping"></div>
                       )}
@@ -483,7 +623,7 @@ function VoiceAssistant() {
                     {isLoading ? (
                       <div className="animate-spin rounded-full h-7 w-7 border-3 border-white/30 border-t-white relative z-10"></div>
                     ) : (
-                      <span className="text-2xl relative z-10">🚀</span>
+                      <FaPaperPlane className="text-2xl text-white relative z-10" />
                     )}
                   </button>
                 </div>
@@ -493,19 +633,19 @@ function VoiceAssistant() {
               <div className="mt-4 flex items-center justify-between text-sm text-white/60">
                 <div className="flex items-center space-x-6">
                   <span className="flex items-center space-x-2">
-                    <span>💡</span>
-                    <span>Try: "What's the weather?" or "Set a reminder"</span>
+                    <FaLightbulb />
+                    <span>Try: "Weather in Tokyo" or "Set a reminder"</span>
                   </span>
                 </div>
                 <div className="flex items-center space-x-4 text-xs">
                   {isVoiceSupported && (
                     <span className="flex items-center space-x-2 px-3 py-1 bg-green-500/20 rounded-full border border-green-400/30">
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                      <FaCircle className="text-green-400 animate-pulse" style={{fontSize: '8px'}} />
                       <span className="text-green-200 font-medium">Voice Ready</span>
                     </span>
                   )}
                   <span className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-400/30">
-                    <span>⌨️</span>
+                    <FaKeyboard />
                     <span className="text-blue-200 font-medium">Shift + Enter for new line</span>
                   </span>
                 </div>
@@ -516,66 +656,206 @@ function VoiceAssistant() {
       </div>
       
       {/* Sliding Tools Panel */}
-      <div className={`fixed inset-y-0 right-0 w-80 bg-white/10 backdrop-blur-md border-l border-white/20 transform transition-transform duration-300 ease-in-out z-40 tools-panel ${
+      <div className={`fixed top-20 bottom-0 right-0 w-96 bg-white/10 backdrop-blur-md border-l border-white/20 transform transition-transform duration-300 ease-in-out z-40 tools-panel ${
         showTools ? 'translate-x-0' : 'translate-x-full'
       }`}>
         <div className="h-full flex flex-col">
           {/* Tools Header */}
           <div className="p-4 border-b border-white/20">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Assistant Tools</h3>
+              <div className="flex items-center space-x-2">
+                {activeToolView === 'reminders' && (
+                  <button
+                    onClick={() => setActiveToolView('main')}
+                    className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all duration-300 mr-2"
+                  >
+                    <FaArrowLeft className="text-white text-sm" />
+                  </button>
+                )}
+                <h3 className="text-lg font-semibold text-white">
+                  {activeToolView === 'reminders' ? 'Reminder Manager' : 'Assistant Tools'}
+                </h3>
+              </div>
               <button
-                onClick={() => setShowTools(false)}
+                onClick={handleToolsClose}
                 className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all duration-300"
               >
-                <span>✕</span>
+                <FaTimes className="text-white" />
               </button>
             </div>
           </div>
           
           {/* Tools Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <QuickActions 
-              onAction={handleQuickAction}
-              isLoading={isLoading}
-            />
-            
-            {/* Voice Commands Help */}
-            <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <span className="text-lg">💡</span>
-                <h4 className="font-semibold text-white">Voice Commands</h4>
-              </div>
-              <div className="text-sm text-blue-200 space-y-2">
-                <div>• "What time is it?"</div>
-                <div>• "Weather in Mumbai"</div>
-                <div>• "Latest news"</div>
-                <div>• "Remind me to call mom"</div>
-                <div>• "Set a reminder for 5 PM"</div>
-              </div>
-            </div>
-            
-            {/* Settings */}
-            <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <span className="text-lg">⚙️</span>
-                <h4 className="font-semibold text-white">Settings</h4>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-white">Voice Output</span>
-                  <button className="w-10 h-6 bg-green-500 rounded-full relative">
-                    <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
-                  </button>
+            {activeToolView === 'main' ? (
+              <>
+                <QuickActions 
+                  onAction={handleQuickAction}
+                  isLoading={isLoading}
+                />
+                
+                {/* Voice Commands Help */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <FaLightbulb className="text-lg text-yellow-400" />
+                    <h4 className="font-semibold text-white">Voice Commands</h4>
+                  </div>
+                  <div className="text-sm text-blue-200 space-y-2">
+                    <div>• "What time is it?"</div>
+                    <div>• "Weather in Mumbai" / "London weather"</div>
+                    <div>• "Temperature in Dubai"</div>
+                    <div>• "Latest news" / "Technology news"</div>
+                    <div>• "Remind me to call mom"</div>
+                    <div>• "Set a reminder for 5 PM"</div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-white">Auto-scroll</span>
-                  <button className="w-10 h-6 bg-green-500 rounded-full relative">
-                    <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
-                  </button>
+                
+                {/* Settings */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <FaCog className="text-lg text-gray-400" />
+                    <h4 className="font-semibold text-white">Settings</h4>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white flex items-center space-x-2">
+                        <FaVolumeUp className="text-blue-400" />
+                        <span>Voice Output</span>
+                      </span>
+                      <button className="w-10 h-6 bg-green-500 rounded-full relative">
+                        <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-white flex items-center space-x-2">
+                        <FaChevronUp className="text-blue-400" />
+                        <span>Auto-scroll</span>
+                      </span>
+                      <button className="w-10 h-6 bg-green-500 rounded-full relative">
+                        <div className="w-4 h-4 bg-white rounded-full absolute top-1 right-1"></div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Reminder Management Interface */
+              <div className="space-y-4">
+                {/* Create New Reminder */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <FaPlus className="text-lg text-green-400" />
+                    <h4 className="font-semibold text-white">Create New Reminder</h4>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Reminder Text */}
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">
+                        What should I remind you about?
+                      </label>
+                      <input
+                        type="text"
+                        value={reminderInput}
+                        onChange={(e) => setReminderInput(e.target.value)}
+                        placeholder="e.g., call mom, meeting with team, buy groceries"
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/60 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                      />
+                    </div>
+                    
+                    {/* Time and Date */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-blue-200 mb-2">
+                          <FaClock className="inline mr-1" />
+                          Time (optional)
+                        </label>
+                        <input
+                          type="time"
+                          value={reminderTime}
+                          onChange={(e) => setReminderTime(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-200 mb-2">
+                          <FaCalendarAlt className="inline mr-1" />
+                          Date (optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={reminderDate}
+                          onChange={(e) => setReminderDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleCreateReminder}
+                        disabled={!reminderInput.trim() || isLoading}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-600 hover:to-emerald-600 transition-all duration-200 flex items-center justify-center space-x-2"
+                      >
+                        <FaCheck />
+                        <span>Create Reminder</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReminderInput('')
+                          setReminderTime('')
+                          setReminderDate('')
+                        }}
+                        className="bg-white/10 border border-white/20 text-white py-2 px-4 rounded-lg font-medium hover:bg-white/20 transition-all duration-200 flex items-center justify-center"
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* View Existing Reminders */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <FaBell className="text-lg text-yellow-400" />
+                      <h4 className="font-semibold text-white">My Reminders</h4>
+                    </div>
+                    <button
+                      onClick={handleGetReminders}
+                      disabled={isLoading}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-1 px-3 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-600 hover:to-purple-600 transition-all duration-200 flex items-center space-x-1"
+                    >
+                      <FaEye className="text-xs" />
+                      <span>View All</span>
+                    </button>
+                  </div>
+                  <p className="text-sm text-blue-200 mb-3">
+                    Click "View All" to see your current reminders, or use voice commands like:
+                  </p>
+                  <div className="text-sm text-blue-200 space-y-1">
+                    <div>• "Show my reminders"</div>
+                    <div>• "List all reminders"</div>
+                    <div>• "What reminders do I have?"</div>
+                  </div>
+                </div>
+                
+                {/* Voice Command Tips */}
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl border border-white/20 p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <FaLightbulb className="text-lg text-yellow-400" />
+                    <h4 className="font-semibold text-white">Voice Command Examples</h4>
+                  </div>
+                  <div className="text-sm text-blue-200 space-y-2">
+                    <div>• "Remind me to call mom in 30 minutes"</div>
+                    <div>• "Set a reminder for 3 PM today"</div>
+                    <div>• "Remind me to buy groceries tomorrow"</div>
+                    <div>• "Set a reminder for the meeting at 2 PM"</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
