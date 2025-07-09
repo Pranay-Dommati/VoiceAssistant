@@ -43,6 +43,8 @@ function VoiceAssistant() {
   const [reminderInput, setReminderInput] = useState('')
   const [reminderTime, setReminderTime] = useState('')
   const [reminderDate, setReminderDate] = useState('')
+  const [reminders, setReminders] = useState([])
+  const [editingReminder, setEditingReminder] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const chatEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -331,9 +333,24 @@ function VoiceAssistant() {
     setReminderTime('')
     setReminderDate('')
     
-    // Close the reminders panel
-    setActiveToolView('main')
-    setShowTools(false)
+    // Refresh the reminders list
+    await fetchReminders()
+  }
+
+  const fetchReminders = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reminders`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setReminders(data.data || [])
+      } else {
+        setReminders([])
+      }
+    } catch (error) {
+      console.error('Error fetching reminders:', error)
+      setReminders([])
+    }
   }
 
   const handleGetReminders = async () => {
@@ -364,10 +381,95 @@ function VoiceAssistant() {
     }
   }
 
+  const handleDeleteReminder = async (reminderId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/reminders/${reminderId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        // Remove from local state
+        setReminders(prev => prev.filter(r => r.id !== reminderId))
+        addMessage(`🤖 Assistant: Reminder deleted successfully.`, 'assistant')
+        // Refresh the reminders list
+        await fetchReminders()
+      } else {
+        addMessage(`🤖 Assistant: Failed to delete reminder.`, 'assistant')
+      }
+    } catch (error) {
+      console.error('Error deleting reminder:', error)
+      addMessage(`🤖 Assistant: Error deleting reminder.`, 'assistant')
+    }
+  }
+
+  const handleEditReminder = (reminder) => {
+    setEditingReminder(reminder)
+    setReminderInput(reminder.text)
+    // Convert ISO time to input format
+    const reminderTime = new Date(reminder.time)
+    setReminderTime(reminderTime.toTimeString().slice(0, 5))
+    setReminderDate(reminderTime.toISOString().split('T')[0])
+  }
+
+  const handleUpdateReminder = async () => {
+    if (!editingReminder || !reminderInput.trim()) return
+
+    try {
+      const reminderDateTime = new Date()
+      if (reminderDate) {
+        const [year, month, day] = reminderDate.split('-')
+        reminderDateTime.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day))
+      }
+      if (reminderTime) {
+        const [hours, minutes] = reminderTime.split(':')
+        reminderDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+      }
+
+      const response = await fetch(`${API_BASE_URL}/reminders/${editingReminder.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: reminderInput,
+          time: reminderDateTime.toISOString()
+        })
+      })
+
+      if (response.ok) {
+        // Update local state
+        setReminders(prev => prev.map(r => 
+          r.id === editingReminder.id 
+            ? { ...r, text: reminderInput, time: reminderDateTime.toISOString() }
+            : r
+        ))
+        setEditingReminder(null)
+        setReminderInput('')
+        setReminderTime('')
+        setReminderDate('')
+        addMessage(`🤖 Assistant: Reminder updated successfully.`, 'assistant')
+        // Refresh the reminders list
+        await fetchReminders()
+      } else {
+        addMessage(`🤖 Assistant: Failed to update reminder.`, 'assistant')
+      }
+    } catch (error) {
+      console.error('Error updating reminder:', error)
+      addMessage(`🤖 Assistant: Error updating reminder.`, 'assistant')
+    }
+  }
+
   const handleToolsClose = () => {
     setShowTools(false)
     setActiveToolView('main')
   }
+
+  // Fetch reminders when reminder panel opens
+  useEffect(() => {
+    if (activeToolView === 'reminders') {
+      fetchReminders()
+    }
+  }, [activeToolView])
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -744,8 +846,14 @@ function VoiceAssistant() {
                 {/* Create New Reminder */}
                 <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
                   <div className="flex items-center space-x-2 mb-4">
-                    <FaPlus className="text-lg text-green-400" />
-                    <h4 className="font-semibold text-white">Create New Reminder</h4>
+                    {editingReminder ? (
+                      <FaEdit className="text-lg text-blue-400" />
+                    ) : (
+                      <FaPlus className="text-lg text-green-400" />
+                    )}
+                    <h4 className="font-semibold text-white">
+                      {editingReminder ? 'Edit Reminder' : 'Create New Reminder'}
+                    </h4>
                   </div>
                   
                   <div className="space-y-4">
@@ -794,15 +902,20 @@ function VoiceAssistant() {
                     {/* Action Buttons */}
                     <div className="flex space-x-2">
                       <button
-                        onClick={handleCreateReminder}
+                        onClick={editingReminder ? handleUpdateReminder : handleCreateReminder}
                         disabled={!reminderInput.trim() || isLoading}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-600 hover:to-emerald-600 transition-all duration-200 flex items-center justify-center space-x-2"
+                        className={`flex-1 ${
+                          editingReminder 
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600' 
+                            : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                        } text-white py-2 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2`}
                       >
                         <FaCheck />
-                        <span>Create Reminder</span>
+                        <span>{editingReminder ? 'Update Reminder' : 'Create Reminder'}</span>
                       </button>
                       <button
                         onClick={() => {
+                          setEditingReminder(null)
                           setReminderInput('')
                           setReminderTime('')
                           setReminderDate('')
@@ -815,30 +928,49 @@ function VoiceAssistant() {
                   </div>
                 </div>
                 
-                {/* View Existing Reminders */}
+                {/* My Reminders */}
                 <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <FaBell className="text-lg text-yellow-400" />
-                      <h4 className="font-semibold text-white">My Reminders</h4>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <FaBell className="text-lg text-yellow-400" />
+                    <h4 className="font-semibold text-white">My Reminders</h4>
+                  </div>
+
+                  {reminders.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FaBell className="text-4xl text-white/30 mx-auto mb-3" />
+                      <p className="text-white/60 text-sm">No reminders yet</p>
+                      <p className="text-white/40 text-xs mt-1">Create your first reminder above</p>
                     </div>
-                    <button
-                      onClick={handleGetReminders}
-                      disabled={isLoading}
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-1 px-3 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-600 hover:to-purple-600 transition-all duration-200 flex items-center space-x-1"
-                    >
-                      <FaEye className="text-xs" />
-                      <span>View All</span>
-                    </button>
-                  </div>
-                  <p className="text-sm text-blue-200 mb-3">
-                    Click "View All" to see your current reminders, or use voice commands like:
-                  </p>
-                  <div className="text-sm text-blue-200 space-y-1">
-                    <div>• "Show my reminders"</div>
-                    <div>• "List all reminders"</div>
-                    <div>• "What reminders do I have?"</div>
-                  </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {reminders.map((reminder) => (
+                        <div key={reminder.id} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-white font-medium text-sm">{reminder.text}</p>
+                              <p className="text-blue-200 text-xs mt-1">{reminder.formatted_time}</p>
+                            </div>
+                            <div className="flex items-center space-x-2 ml-3">
+                              <button
+                                onClick={() => handleEditReminder(reminder)}
+                                className="w-7 h-7 bg-blue-500/20 border border-blue-400/30 rounded-lg flex items-center justify-center hover:bg-blue-500/30 transition-all duration-200"
+                                title="Edit reminder"
+                              >
+                                <FaEdit className="text-xs text-blue-400" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteReminder(reminder.id)}
+                                className="w-7 h-7 bg-red-500/20 border border-red-400/30 rounded-lg flex items-center justify-center hover:bg-red-500/30 transition-all duration-200"
+                                title="Delete reminder"
+                              >
+                                <FaTrash className="text-xs text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Voice Command Tips */}
