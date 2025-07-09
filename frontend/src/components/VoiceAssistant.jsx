@@ -339,12 +339,18 @@ function VoiceAssistant() {
 
   const fetchReminders = async () => {
     try {
+      console.log('Fetching reminders...')
       const response = await fetch(`${API_BASE_URL}/reminders`)
+      console.log('Fetch reminders response status:', response.status)
+      
       const data = await response.json()
+      console.log('Fetch reminders data:', data)
       
       if (data.success) {
         setReminders(data.data || [])
+        console.log('Updated reminders state:', data.data)
       } else {
+        console.error('Failed to fetch reminders:', data.error)
         setReminders([])
       }
     } catch (error) {
@@ -383,22 +389,27 @@ function VoiceAssistant() {
 
   const handleDeleteReminder = async (reminderId) => {
     try {
+      console.log('Deleting reminder with ID:', reminderId)
       const response = await fetch(`${API_BASE_URL}/reminders/${reminderId}`, {
         method: 'DELETE'
       })
       
-      if (response.ok) {
+      console.log('Delete response status:', response.status)
+      const data = await response.json()
+      console.log('Delete response data:', data)
+      
+      if (response.ok && data.success) {
         // Remove from local state
         setReminders(prev => prev.filter(r => r.id !== reminderId))
-        addMessage(`🤖 Assistant: Reminder deleted successfully.`, 'assistant')
+        addMessage(`🤖 Assistant: ${data.response}`, 'assistant')
         // Refresh the reminders list
         await fetchReminders()
       } else {
-        addMessage(`🤖 Assistant: Failed to delete reminder.`, 'assistant')
+        addMessage(`🤖 Assistant: ${data.response || 'Failed to delete reminder.'}`, 'assistant')
       }
     } catch (error) {
       console.error('Error deleting reminder:', error)
-      addMessage(`🤖 Assistant: Error deleting reminder.`, 'assistant')
+      addMessage(`🤖 Assistant: Error deleting reminder: ${error.message}`, 'assistant')
     }
   }
 
@@ -425,6 +436,12 @@ function VoiceAssistant() {
         reminderDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0)
       }
 
+      console.log('Updating reminder:', {
+        id: editingReminder.id,
+        text: reminderInput,
+        time: reminderDateTime.toISOString()
+      })
+
       const response = await fetch(`${API_BASE_URL}/reminders/${editingReminder.id}`, {
         method: 'PUT',
         headers: {
@@ -436,7 +453,11 @@ function VoiceAssistant() {
         })
       })
 
-      if (response.ok) {
+      console.log('Update response status:', response.status)
+      const data = await response.json()
+      console.log('Update response data:', data)
+
+      if (response.ok && data.success) {
         // Update local state
         setReminders(prev => prev.map(r => 
           r.id === editingReminder.id 
@@ -447,15 +468,15 @@ function VoiceAssistant() {
         setReminderInput('')
         setReminderTime('')
         setReminderDate('')
-        addMessage(`🤖 Assistant: Reminder updated successfully.`, 'assistant')
+        addMessage(`🤖 Assistant: ${data.response}`, 'assistant')
         // Refresh the reminders list
         await fetchReminders()
       } else {
-        addMessage(`🤖 Assistant: Failed to update reminder.`, 'assistant')
+        addMessage(`🤖 Assistant: ${data.response || 'Failed to update reminder.'}`, 'assistant')
       }
     } catch (error) {
       console.error('Error updating reminder:', error)
-      addMessage(`🤖 Assistant: Error updating reminder.`, 'assistant')
+      addMessage(`🤖 Assistant: Error updating reminder: ${error.message}`, 'assistant')
     }
   }
 

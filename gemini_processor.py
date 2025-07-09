@@ -9,13 +9,18 @@ from command_parser import CommandParser
 class GeminiCommandProcessor:
     def __init__(self):
         # Configure Gemini API
-        genai.configure(api_key="AIzaSyCeEzuEj-HkFd5UcabGy28bULZjnsYy9Ek")
+        genai.configure(api_key=config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         self.command_parser = CommandParser()
+        self.conversation_context = None  # Store conversation context
         
     def process_command(self, command: str) -> Dict[str, Any]:
         """Process command using Gemini AI for better understanding"""
         try:
+            # Check if we have a pending reminder that needs completion
+            if self.conversation_context and self.conversation_context.get("waiting_for_reminder_text"):
+                return self._handle_reminder_completion(command)
+                
             # Create a prompt for Gemini to understand the command intent
             prompt = f"""
 You are a voice assistant AI. Analyze the following user command and determine the intent and extract relevant information.
@@ -23,20 +28,24 @@ You are a voice assistant AI. Analyze the following user command and determine t
 User command: "{command}"
 
 Please respond with a JSON object containing:
-1. "intent": One of ["time", "weather", "news", "reminder_set", "reminder_list", "help", "unknown"]
+1. "intent": One of ["time", "weather", "news", "reminder_set", "reminder_incomplete", "reminder_list", "help", "unknown"]
 2. "entities": Extracted entities based on intent:
    - For weather: {{"city": "city_name"}}
    - For news: {{"category": "general|technology|sports|business|health|science|entertainment"}}
    - For reminder_set: {{"text": "reminder_text", "time_expression": "time_expression"}}
+   - For reminder_incomplete: {{"time_expression": "time_expression"}} (when only time is given without task)
    - For other intents: {{}}
 3. "natural_response": A natural, conversational response to the user
 4. "confidence": A number between 0-1 indicating confidence in the classification
 
 Examples:
 - "Call mom in 10 minutes" → intent: "reminder_set", entities: {{"text": "call mom", "time_expression": "in 10 minutes"}}
+- "Set reminder at 12:43" → intent: "reminder_incomplete", entities: {{"time_expression": "at 12:43"}}
 - "What's the weather in Mumbai?" → intent: "weather", entities: {{"city": "Mumbai"}}
 - "Tell me about new news" → intent: "news", entities: {{"category": "general"}}
 - "What time is it?" → intent: "time", entities: {{}}
+
+For incomplete reminders (only time given), respond with a question asking what to remind about.
 
 Respond only with valid JSON, no markdown formatting.
 """
@@ -62,6 +71,8 @@ Respond only with valid JSON, no markdown formatting.
                     return self._handle_news(result, command)
                 elif result["intent"] == "reminder_set":
                     return self._handle_reminder_set(result, command)
+                elif result["intent"] == "reminder_incomplete":
+                    return self._handle_reminder_incomplete(result, command)
                 elif result["intent"] == "reminder_list":
                     return self._handle_reminder_list(result)
                 elif result["intent"] == "time":
@@ -131,6 +142,47 @@ Respond only with valid JSON, no markdown formatting.
                 "confidence": result.get("confidence", 0.5)
             }
     
+    def _handle_reminder_incomplete(self, result: Dict, command: str) -> Dict[str, Any]:
+        """Handle incomplete reminder commands (only time given, no text)"""
+        entities = result.get("entities", {})
+        time_expression = entities.get("time_expression", "")
+        
+        # Try to parse the time from the command
+        try:
+            # Extract time using the command parser
+            parsed_time = self.command_parser.parse_time_expression(time_expression or command)
+            
+            if parsed_time:
+                # Store the context for the next message
+                self.conversation_context = {
+                    "waiting_for_reminder_text": True,
+                    "stored_time": parsed_time.isoformat(),
+                    "time_expression": time_expression
+                }
+                
+                return {
+                    "action": "reminder_incomplete",
+                    "time": parsed_time.isoformat(),
+                    "formatted_time": parsed_time.strftime("%I:%M %p on %B %d"),
+                    "response": result.get("natural_response", "Okay, I've set a reminder for {}. What should I remind you about?".format(parsed_time.strftime("%I:%M %p"))),
+                    "confidence": result.get("confidence", 0.8)
+                }
+            else:
+                return {
+                    "action": "reminder_incomplete",
+                    "error": "Could not parse time",
+                    "response": "I couldn't understand the time. Please try again with a specific time like '12:43 PM' or 'in 10 minutes'.",
+                    "confidence": result.get("confidence", 0.3)
+                }
+                
+        except Exception as e:
+            return {
+                "action": "reminder_incomplete",
+                "error": f"Time parsing error: {str(e)}",
+                "response": "I couldn't understand the time. Please try again with a specific time.",
+                "confidence": result.get("confidence", 0.3)
+            }
+
     def _handle_reminder_list(self, result: Dict) -> Dict[str, Any]:
         """Handle reminder listing commands"""
         return {
@@ -211,6 +263,38 @@ Commands you can try:
         else:
             return {"action": "unknown", "response": "I'm not sure how to help with that. Try asking about time, weather, news, or reminders.", "confidence": 0.2}
 
+    def _handle_reminder_completion(self, command: str) -> Dict[str, Any]:
+        """Handle completion of a reminder that was waiting for text"""
+        try:
+            # Get the stored time from context
+            stored_time = self.conversation_context.get("stored_time")
+            
+            # Use the command as the reminder text
+            reminder_text = command.strip()
+            
+            # Clear the context
+            self.conversation_context = None
+            
+            # Return the completed reminder
+            return {
+                "action": "reminder_set",
+                "text": reminder_text,
+                "time": stored_time,
+                "formatted_time": datetime.fromisoformat(stored_time).strftime("%I:%M %p on %B %d"),
+                "response": f"Setting reminder: {reminder_text}",
+                "confidence": 0.9
+            }
+            
+        except Exception as e:
+            # Clear context on error
+            self.conversation_context = None
+            return {
+                "action": "reminder_set",
+                "error": "Could not complete reminder",
+                "response": "Sorry, I couldn't complete your reminder. Please try again.",
+                "confidence": 0.3
+            }
+    
     def generate_natural_response(self, action_result: Dict[str, Any]) -> str:
         """Generate a natural response using Gemini based on action result"""
         try:

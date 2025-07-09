@@ -159,3 +159,62 @@ class CommandParser:
                     return category
         
         return 'general'  # Default category
+
+    def parse_time_expression(self, time_str: str) -> Optional[datetime]:
+        """Parse time expression like 'at 12:43', 'in 10 minutes', etc."""
+        time_str = time_str.lower().strip()
+        
+        # Remove common prefixes
+        prefixes = ['at ', 'in ', 'after ', 'for ']
+        for prefix in prefixes:
+            if time_str.startswith(prefix):
+                time_str = time_str[len(prefix):].strip()
+                break
+        
+        # Try parsing specific time (e.g., "12:43", "12:43 PM")
+        specific_time_match = re.search(r'(\d{1,2}):(\d{2})\s*(am|pm)?', time_str)
+        if specific_time_match:
+            hour = int(specific_time_match.group(1))
+            minute = int(specific_time_match.group(2))
+            period = specific_time_match.group(3)
+            
+            # Convert to 24-hour format
+            if period and period.lower() == 'pm' and hour != 12:
+                hour += 12
+            elif period and period.lower() == 'am' and hour == 12:
+                hour = 0
+            
+            now = datetime.now()
+            target_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            
+            # If the time has passed today, schedule for tomorrow
+            if target_time <= now:
+                target_time += timedelta(days=1)
+            
+            return target_time
+        
+        # Try parsing relative time (e.g., "10 minutes", "2 hours")
+        for unit, pattern in self.time_patterns.items():
+            if unit == 'specific_time':
+                continue
+                
+            match = re.search(pattern, time_str)
+            if match:
+                amount = int(match.group(1))
+                
+                if unit == 'minutes':
+                    return datetime.now() + timedelta(minutes=amount)
+                elif unit == 'hours':
+                    return datetime.now() + timedelta(hours=amount)
+                elif unit == 'days':
+                    return datetime.now() + timedelta(days=amount)
+                elif unit == 'weeks':
+                    return datetime.now() + timedelta(weeks=amount)
+        
+        # Try parsing simple numbers as minutes
+        number_match = re.search(r'(\d+)', time_str)
+        if number_match:
+            amount = int(number_match.group(1))
+            return datetime.now() + timedelta(minutes=amount)
+        
+        return None

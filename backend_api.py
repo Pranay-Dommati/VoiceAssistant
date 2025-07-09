@@ -160,7 +160,14 @@ def get_reminders():
             })
         
         if response_data:
-            response = f"You have {len(response_data)} upcoming reminders"
+            if len(response_data) == 1:
+                reminder = response_data[0]
+                response = f"You have 1 upcoming reminder: '{reminder['text']}' at {reminder['formatted_time']}"
+            else:
+                response = f"You have {len(response_data)} upcoming reminders:\n"
+                for i, reminder in enumerate(response_data, 1):
+                    response += f"{i}. '{reminder['text']}' at {reminder['formatted_time']}\n"
+                response = response.strip()  # Remove trailing newline
         else:
             response = "You have no upcoming reminders"
         
@@ -217,6 +224,69 @@ def add_reminder():
             'success': False,
             'error': str(e),
             'response': f"Error adding reminder: {str(e)}"
+        }), 500
+
+@app.route('/api/reminders/<int:reminder_id>', methods=['DELETE'])
+def delete_reminder(reminder_id):
+    """Delete a specific reminder"""
+    try:
+        if reminder_manager.delete_reminder(reminder_id):
+            return jsonify({
+                'success': True,
+                'response': 'Reminder deleted successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Reminder not found',
+                'response': 'Could not find that reminder to delete'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': f"Error deleting reminder: {str(e)}"
+        }), 500
+
+@app.route('/api/reminders/<int:reminder_id>', methods=['PUT'])
+def update_reminder(reminder_id):
+    """Update a specific reminder"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        time_str = data.get('time', '')
+        
+        if not text or not time_str:
+            return jsonify({
+                'success': False,
+                'error': 'Missing text or time',
+                'response': 'Please provide both text and time for the reminder'
+            }), 400
+        
+        reminder_time = datetime.fromisoformat(time_str)
+        
+        if reminder_manager.update_reminder(reminder_id, text, reminder_time):
+            return jsonify({
+                'success': True,
+                'response': 'Reminder updated successfully',
+                'data': {
+                    'id': reminder_id,
+                    'text': text,
+                    'time': time_str,
+                    'formatted_time': reminder_time.strftime("%I:%M %p on %B %d")
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Reminder not found',
+                'response': 'Could not find that reminder to update'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': f"Error updating reminder: {str(e)}"
         }), 500
 
 @app.route('/api/command', methods=['POST'])
@@ -347,6 +417,25 @@ def process_command():
         
         elif result["action"] == "reminder_list":
             return get_reminders()
+        
+        elif result["action"] == "reminder_incomplete":
+            # Handle incomplete reminder (just time provided, waiting for task)
+            if "error" in result:
+                return jsonify({
+                    'success': False,
+                    'error': result["error"],
+                    'response': result["response"]
+                })
+            
+            return jsonify({
+                'success': True,
+                'response': result["response"],
+                'data': {
+                    'reminder_incomplete': True,
+                    'time': result.get("time"),
+                    'formatted_time': result.get("formatted_time")
+                }
+            })
         
         elif result["action"] == "help":
             return jsonify({

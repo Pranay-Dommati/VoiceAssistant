@@ -173,3 +173,13 @@ class ReminderManager:
                 self.save_reminders()
                 return True
         return False
+    
+    def update_reminder(self, reminder_id: int, text: str, reminder_time: datetime) -> bool:
+        """Update a reminder by ID"""
+        for reminder in self.reminders:
+            if reminder["id"] == reminder_id:
+                reminder["text"] = text
+                reminder["time"] = reminder_time.isoformat()
+                self.save_reminders()
+                return True
+        return False
