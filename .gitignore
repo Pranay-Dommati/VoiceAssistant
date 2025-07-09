@@ -1,0 +1,7 @@
+# .gitignore
+.env
+__pycache__/
+*.log
+node_modules/
+*.sqlite3
+front
