@@ -56,6 +56,7 @@ function VoiceAssistant() {
     if (!isInitialized) {
       fetchConfig()
       initializeVoice()
+      fetchReminders() // Fetch reminders on initial load
       setIsInitialized(true)
       
       // Add initial message only once, after a short delay
@@ -246,6 +247,11 @@ function VoiceAssistant() {
         addMessage(responseMessage, 'assistant')
         // Speak the response
         speakText(responseMessage)
+        
+        // Check if this was a reminder command and refresh the reminders list
+        if (data.data && (data.data.text || data.data.reminder_incomplete)) {
+          await fetchReminders()
+        }
       } else {
         const errorMessage = `🤖 Assistant: ${data.response || 'Sorry, I encountered an error.'}`
         addMessage(errorMessage, 'assistant')
@@ -264,9 +270,10 @@ function VoiceAssistant() {
 
   const handleQuickAction = async (action) => {
     if (action === 'reminders') {
-      // Open the reminders panel instead of making an API call
+      // Open the reminders panel and fetch reminders
       setActiveToolView('reminders')
       setShowTools(true)
+      await fetchReminders()
       return
     }
 
