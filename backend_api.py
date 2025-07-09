@@ -344,16 +344,22 @@ def process_command():
             city = result.get("city", config.DEFAULT_CITY)
             weather_response = get_weather_for_city(city)
             
-            if weather_response.status_code == 200:
+            # Handle the case where get_weather_for_city returns a tuple
+            if isinstance(weather_response, tuple):
+                weather_data = weather_response[0].get_json()
+                status_code = weather_response[1]
+            else:
                 weather_data = weather_response.get_json()
-                if weather_data.get("success"):
-                    # Generate natural response with Gemini
-                    natural_response = gemini_processor.generate_natural_response({
-                        "action": "weather",
-                        "success": True,
-                        "data": weather_data.get("data", {})
-                    })
-                    weather_data["response"] = natural_response
+                status_code = 200
+            
+            if status_code == 200 and weather_data.get("success"):
+                # Generate natural response with Gemini
+                natural_response = gemini_processor.generate_natural_response({
+                    "action": "weather",
+                    "success": True,
+                    "data": weather_data.get("data", {})
+                })
+                weather_data["response"] = natural_response
                 return jsonify(weather_data)
             else:
                 return weather_response
