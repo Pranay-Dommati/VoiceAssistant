@@ -11,7 +11,7 @@ NEWS_API_KEY = "9e055a432e1c447fa8827f19e44e85d0"
 
 # Gemini API Key
 # Get yours at: https://ai.google.dev/
-GEMINI_API_KEY = "AIzaSyCeEzuEj-HkFd5UcabGy28bULZjnsYy9Ek"
+GEMINI_API_KEY = "AIzaSyCZu1pGSqO1NyGusbPdBVzJlgLs06mLO30"
 
 # Default settings
 DEFAULT_CITY = "New York"

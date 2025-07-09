@@ -1,72 +1,9 @@
 [
   {
     "id": 1,
-    "text": "call mom",
-    "time": "2025-07-09T22:59:00",
-    "completed": true,
-    "created": "2025-07-09T22:57:28.914074"
-  },
-  {
-    "id": 2,
-    "text": "call mom",
-    "time": "2025-07-09T23:06:00",
-    "completed": true,
-    "created": "2025-07-09T23:05:58.910609"
-  },
-  {
-    "id": 3,
-    "text": "call mom",
-    "time": "2025-07-09T23:31:09.063592",
-    "completed": true,
-    "created": "2025-07-09T23:21:09.064591"
-  },
-  {
-    "id": 5,
-    "text": "call mom",
-    "time": "2025-07-10T00:29:00",
-    "completed": true,
-    "created": "2025-07-10T00:28:29.486198"
-  },
-  {
-    "id": 6,
-    "text": "call mom",
-    "time": "2025-07-10T00:31:00",
-    "completed": true,
-    "created": "2025-07-10T00:30:24.634434"
-  },
-  {
-    "id": 6,
-    "text": "call mom",
-    "time": "2025-07-10T00:41:00",
-    "completed": true,
-    "created": "2025-07-10T00:39:57.800128"
-  },
-  {
-    "id": 7,
-    "text": "call mom",
-    "time": "2025-07-10T00:43:00",
-    "completed": true,
-    "created": "2025-07-10T00:41:52.690160"
-  },
-  {
-    "id": 8,
-    "text": "set alarm",
-    "time": "2025-07-10T12:43:00",
+    "text": "Call Amma.",
+    "time": "2025-07-10T13:20:00",
     "completed": false,
-    "created": "2025-07-10T00:42:16.312073"
-  },
-  {
-    "id": 9,
-    "text": "",
-    "time": "2025-07-10T12:43:00",
-    "completed": false,
-    "created": "2025-07-10T00:42:30.303624"
-  },
-  {
-    "id": 10,
-    "text": "Call Dad.",
-    "time": "2025-07-10T01:15:09.446841",
-    "completed": false,
-    "created": "2025-07-10T01:02:18.821909"
+    "created": "2025-07-10T01:19:07.811887"
   }
 ]

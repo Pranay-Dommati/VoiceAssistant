@@ -289,6 +289,32 @@ def update_reminder(reminder_id):
             'response': f"Error updating reminder: {str(e)}"
         }), 500
 
+@app.route('/api/reminders/clear', methods=['DELETE'])
+def clear_all_reminders():
+    """Clear all reminders"""
+    try:
+        if reminder_manager.clear_all_reminders():
+            return jsonify({
+                'success': True,
+                'response': 'All reminders cleared successfully',
+                'data': {
+                    'cleared': True,
+                    'count': 0
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to clear reminders',
+                'response': 'Could not clear reminders'
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'response': f"Error clearing reminders: {str(e)}"
+        }), 500
+
 @app.route('/api/command', methods=['POST'])
 def process_command():
     """Process a general command using Gemini AI"""

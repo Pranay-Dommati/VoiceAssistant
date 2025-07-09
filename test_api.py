@@ -107,6 +107,39 @@ def test_time():
     else:
         print(f"❌ Failed to send time command: {response.status_code}")
 
+def test_clear_reminders():
+    print("\n🧪 Testing clear reminders functionality...")
+    
+    # Test clear reminders command
+    print("\n6. Testing clear reminders: DELETE /api/reminders/clear")
+    response = requests.delete(f"{API_BASE_URL}/reminders/clear")
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Response: {data['response']}")
+        print(f"📊 Data: {data.get('data', {})}")
+        
+        if data.get('success'):
+            print("🎉 Clear reminders successful!")
+            
+            # Verify reminders are cleared
+            print("\n7. Verifying reminders are cleared...")
+            verify_response = requests.get(f"{API_BASE_URL}/reminders")
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                reminder_list = verify_data.get('data', [])
+                reminder_count = len(reminder_list)
+                print(f"📊 Remaining reminders: {reminder_count}")
+                
+                if reminder_count == 0:
+                    print("✅ All reminders successfully cleared!")
+                else:
+                    print("❌ Some reminders still remain")
+        else:
+            print("❌ Failed to clear reminders")
+    else:
+        print(f"❌ Failed to clear reminders: {response.status_code}")
+
 def main():
     print("🚀 Starting Voice Assistant API Tests...")
     
@@ -129,6 +162,7 @@ def main():
     test_complete_reminder()
     test_weather()
     test_time()
+    test_clear_reminders()
     
     print("\n🏁 Tests completed!")
 

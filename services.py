@@ -183,3 +183,12 @@ class ReminderManager:
                 self.save_reminders()
                 return True
         return False
+
+    def clear_all_reminders(self) -> bool:
+        """Clear all reminders"""
+        try:
+            self.reminders = []
+            self.save_reminders()
+            return True
+        except Exception:
+            return False

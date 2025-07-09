@@ -413,6 +413,32 @@ function VoiceAssistant() {
     }
   }
 
+  const handleClearAllReminders = async () => {
+    try {
+      console.log('Clearing all reminders')
+      const response = await fetch(`${API_BASE_URL}/reminders/clear`, {
+        method: 'DELETE'
+      })
+      
+      console.log('Clear all response status:', response.status)
+      const data = await response.json()
+      console.log('Clear all response data:', data)
+      
+      if (response.ok && data.success) {
+        // Clear local state
+        setReminders([])
+        addMessage(`🤖 Assistant: ${data.response}`, 'assistant')
+        // Refresh the reminders list
+        await fetchReminders()
+      } else {
+        addMessage(`🤖 Assistant: ${data.response || 'Failed to clear reminders.'}`, 'assistant')
+      }
+    } catch (error) {
+      console.error('Error clearing reminders:', error)
+      addMessage(`🤖 Assistant: Error clearing reminders: ${error.message}`, 'assistant')
+    }
+  }
+
   const handleEditReminder = (reminder) => {
     setEditingReminder(reminder)
     setReminderInput(reminder.text)
@@ -951,9 +977,20 @@ function VoiceAssistant() {
                 
                 {/* My Reminders */}
                 <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-4">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <FaBell className="text-lg text-yellow-400" />
-                    <h4 className="font-semibold text-white">My Reminders</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <FaBell className="text-lg text-yellow-400" />
+                      <h4 className="font-semibold text-white">My Reminders</h4>
+                    </div>
+                    {reminders.length > 0 && (
+                      <button
+                        onClick={handleClearAllReminders}
+                        className="px-3 py-1 bg-red-500/20 border border-red-400/30 rounded-lg text-red-400 text-xs hover:bg-red-500/30 transition-all duration-200"
+                        title="Clear all reminders"
+                      >
+                        Clear All
+                      </button>
+                    )}
                   </div>
 
                   {reminders.length === 0 ? (
