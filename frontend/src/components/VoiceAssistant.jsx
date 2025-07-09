@@ -590,11 +590,11 @@ function VoiceAssistant() {
               {isSpeaking && (
                 <button
                   onClick={stopSpeaking}
-                  className="relative w-12 h-12 rounded-full bg-gradient-to-r from-red-500 to-red-600 border-2 border-red-400 transition-all duration-300 flex items-center justify-center hover:scale-110 hover:shadow-lg animate-pulse"
+                  className="relative w-12 h-12 rounded-full bg-gradient-to-r from-red-500 to-red-600 border-2 border-red-400 transition-all duration-300 flex items-center justify-center hover:scale-110 hover:shadow-lg"
                   title="Stop speaking"
                 >
                   <FaVolumeUp className="text-xl text-white" />
-                  <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping"></div>
+                  <div className="absolute inset-0 rounded-full border-2 border-red-300/40 animate-pulse"></div>
                 </button>
               )}
               
@@ -728,11 +728,11 @@ function VoiceAssistant() {
               ))}
               
               {isSpeaking && (
-                <div className="flex items-center justify-center space-x-4 py-6 bg-red-500/20 rounded-xl border border-red-400/30 animate-pulse max-w-md mx-auto">
+                <div className="flex items-center justify-center space-x-4 py-6 bg-red-500/20 rounded-xl border border-red-400/30 max-w-md mx-auto">
                   <div className="flex space-x-2">
-                    <div className="w-3 h-3 bg-red-400 rounded-full animate-bounce"></div>
-                    <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-3 h-3 bg-red-400 rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-orange-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                    <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
                   </div>
                   <span className="text-red-200 font-medium flex items-center space-x-2">
                     <FaVolumeUp />
@@ -822,11 +822,11 @@ function VoiceAssistant() {
                     <button
                       type="button"
                       onClick={stopSpeaking}
-                      className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 border-2 border-red-400 rounded-2xl transition-all duration-300 flex items-center justify-center hover:scale-105 animate-pulse"
+                      className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 border-2 border-red-400 rounded-2xl transition-all duration-300 flex items-center justify-center hover:scale-105"
                       title="Stop speaking"
                     >
                       <FaVolumeUp className="text-2xl text-white relative z-10" />
-                      <div className="absolute inset-0 rounded-2xl border-2 border-red-400 animate-ping"></div>
+                      <div className="absolute inset-0 rounded-2xl border-2 border-red-300/50 animate-pulse"></div>
                     </button>
                   )}
                   
